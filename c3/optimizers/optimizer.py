@@ -64,10 +64,10 @@ class Optimizer:
         old_logdir = self.logdir
         self.logdir = new_logdir
         try:
-            os.remove(os.path.join(self.dir_path,'recent'))
+            os.remove(os.path.join(self.dir_path, "recent"))
         except FileNotFoundError:
             pass
-        #os.remove(self.dir_path + self.string)
+        # os.remove(self.dir_path + self.string)
         try:
             os.rmdir(old_logdir)
         except OSError:
@@ -190,7 +190,8 @@ class Optimizer:
             current_params = tf.Variable(x)
             goal = self.goal_run(current_params)  # type: ignore
             self.log_parameters()
-            goal = float(goal.numpy())
+            if isinstance(goal, tf.Tensor):
+                goal = float(goal.numpy())
             return goal
         else:
             current_params = x
@@ -226,7 +227,7 @@ class Optimizer:
             goal = float(goal.numpy())
         return goal
 
-    def goal_run_with_grad(self, current_params):
+    def goal_run_with_grad_no_batch(self, current_params):
         with tf.GradientTape() as t:
             t.watch(current_params)
             goal = self.goal_run(current_params)

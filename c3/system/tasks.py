@@ -161,3 +161,21 @@ class MeasurementRescale(Task):
             pop1 * self.params["meas_scale"].get_value()
             + self.params["meas_offset"].get_value()
         )
+
+    def rescale_inv(self, pop1):
+        """
+        Apply linear rescaling and offset to the readout value.
+
+        Parameters
+        ----------
+        pop1 : tf.float64
+            Population in first excited state.
+
+        Returns
+        -------
+        tf.float64
+            Population after rescaling.
+        """
+        return (pop1 - self.params["meas_offset"].get_value()) / self.params[
+            "meas_scale"
+        ].get_value()
