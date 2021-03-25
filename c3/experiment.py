@@ -243,9 +243,9 @@ class Experiment:
                     pops = pops_select
                 else:
                     pops = tf.reshape(pops, [pops.shape[0]])
-                        if "meas_rescale" in model.tasks:
-                            populations_no_rescale.append(pops)
-                            pops = model.tasks["meas_rescale"].rescale(pops)
+            if "meas_rescale" in model.tasks:
+                populations_no_rescale.append(pops)
+                pops = model.tasks["meas_rescale"].rescale(pops)
             populations_final.append(pops)
         return populations_final, populations_no_rescale
 
