@@ -145,6 +145,16 @@ def rotation(phase, xyz):
     return rot
 
 
+X90p = rotation(np.pi / 2, [1, 0, 0])  # Rx+
+X90m = rotation(-np.pi / 2, [1, 0, 0])  # Rx-
+Xp = rotation(np.pi, [1, 0, 0])
+Xm = rotation(-np.pi, [1, 0, 0])
+Y90p = rotation(np.pi / 2, [0, 1, 0])  # Ry+
+Y90m = rotation(-np.pi / 2, [0, 1, 0])  # Ry-
+Yp = rotation(np.pi, [0, 1, 0])
+Z90p = rotation(np.pi / 2, [0, 0, 1])  # Rz+
+Z90m = rotation(-np.pi / 2, [0, 0, 1])  # Rz-
+Zp = rotation(np.pi, [0, 0, 1])
 RX90p = rotation(np.pi / 2, [1, 0, 0])  # Rx+
 RX90m = rotation(-np.pi / 2, [1, 0, 0])  # Rx-
 RXp = rotation(np.pi, [1, 0, 0])
@@ -279,8 +289,28 @@ def perfect_gate(  # noqa
     # (and ordered)
     for gate_str in gates_str.split(":"):
         lvls = dims[gate_num]
-        if gate_str == "Id":
+        if gate_str == "Id" or gate_str == "QId":
             gate = Id
+        elif gate_str == "X90p":
+            gate = X90p
+        elif gate_str == "X90m":
+            gate = X90m
+        elif gate_str == "Xp":
+            gate = Xp
+        elif gate_str == "Xm":
+            gate = Xm
+        elif gate_str == "Y90p":
+            gate = Y90p
+        elif gate_str == "Y90m":
+            gate = Y90m
+        elif gate_str == "Yp":
+            gate = Yp
+        elif gate_str == "Z90p":
+            gate = Z90p
+        elif gate_str == "Z90m":
+            gate = Z90m
+        elif gate_str == "Zp":
+            gate = Zp
         elif gate_str == "RX90p":
             gate = RX90p
         elif gate_str == "RX90m":
@@ -352,7 +382,7 @@ def perfect_gate(  # noqa
             do_pad_gate = False
         else:
             raise KeyError(
-                "gate_str must be one of the basic 90 or 180 degree gates: 'Id','RX90p','RX90m','RXp','RY90p','RY90m','RYp','RZ90p','RZ90m','RZp', 'CNOT', CRXp, CRZp, CR, CR90, iSWAP"
+                "gate_str must be one of the basic 90 or 180 degree gates: 'QId',Id','X90p','X90m','Xp','Xm','Y90p','Y90m','Yp','Z90p','Z90m','Zp','RX90p','RX90m','RXp','RY90p','RY90m','RYp','RZ90p','RZ90m','RZp', 'CNOT', CRXp, CRZp, CR, CR90, iSWAP"
             )
         if do_pad_gate:
             if proj == "compsub":

@@ -25,6 +25,7 @@ from c3.utils import tf_utils
 from c3.utils.qt_utils import perfect_gate
 
 
+
 class Experiment:
     """
     It models all of the behaviour of the physical experiment, serving as a
@@ -242,9 +243,9 @@ class Experiment:
                     pops = pops_select
                 else:
                     pops = tf.reshape(pops, [pops.shape[0]])
-            if "meas_rescale" in model.tasks:
-                populations_no_rescale.append(pops)
-                pops = model.tasks["meas_rescale"].rescale(pops)
+                        if "meas_rescale" in model.tasks:
+                            populations_no_rescale.append(pops)
+                            pops = model.tasks["meas_rescale"].rescale(pops)
             populations_final.append(pops)
         return populations_final, populations_no_rescale
 
@@ -349,7 +350,7 @@ class Experiment:
                     dephasing_channel = model.get_dephasing_channel(t_final, amps)
                     U = tf.matmul(dephasing_channel, U)
             gates[gate] = U
-            self.unitaries = gates
+        self.unitaries = gates
         return gates
 
     def propagation(self, signal: dict, gate):

@@ -80,7 +80,7 @@ class Device(C3obj):
             End time for this device.
         """
         res = self.resolution
-        self.slice_num = int(np.abs(t_start - t_end) * res)
+        self.slice_num = np.ceil(np.abs(t_start - t_end) * res)
         # return self.slice_num
 
     def create_ts(
@@ -98,8 +98,7 @@ class Device(C3obj):
         centered: boolean
             Sample in the middle of an interval, otherwise at the beginning.
         """
-        if not hasattr(self, "slice_num"):
-            self.calc_slice_num(t_start, t_end)
+        self.calc_slice_num(t_start, t_end)
         dt = 1 / self.resolution
         # TODO This type of centering does not guarantee zeros at the ends
         if centered:
@@ -917,6 +916,8 @@ class LO(Device):
             if isinstance(comp, Carrier):
                 cos, sin = [], []
                 omega_lo = comp.params["freq"].get_value()
+                ssb = tf.constant(0 * -100000000.0 * np.pi * 2, dtype=omega_lo.dtype)
+                omega_lo = omega_lo - ssb
                 if amp_noise and freq_noise:
                     print("amp and freq noise")
                     phi = omega_lo * ts[0]
@@ -1041,7 +1042,7 @@ class AWG(Device):
 
                 xy_angle = comp.params["xy_angle"].get_value()
                 freq_offset = comp.params["freq_offset"].get_value()
-                phase = -xy_angle + freq_offset * ts
+                phase = xy_angle + freq_offset * ts
                 env = comp.get_shape_values(ts)
                 # TODO option to have t_before
                 # env = comp.get_shape_values(ts, t_before)
@@ -1112,7 +1113,7 @@ class AWG(Device):
                 denv = t.gradient(env, ts)
                 if denv is None:
                     denv = tf.zeros_like(ts, dtype=tf.float64)
-                phase = -xy_angle + freq_offset * ts
+                phase = xy_angle + freq_offset * ts
                 inphase_comps.append(
                     amp * (env * tf.cos(phase) + denv * delta * tf.sin(phase))
                 )
@@ -1171,8 +1172,10 @@ class AWG(Device):
                     inphase = tf.math.real(shape)
                     quadrature = tf.math.imag(shape)
                 xy_angle = comp.params["xy_angle"].get_value()
+                # xy_angle = 0
                 freq_offset = comp.params["freq_offset"].get_value()
-                phase = -xy_angle + freq_offset * ts
+                ssb = tf.constant(0 * -100000000.0 * np.pi * 2, dtype=xy_angle.dtype)
+                phase = xy_angle + (freq_offset + ssb) * ts
 
                 if len(inphase) != len(quadrature):
                     raise ValueError("inphase and quadrature are of different lengths.")
@@ -1189,6 +1192,10 @@ class AWG(Device):
                 quadrature_comps.append(
                     quadrature * tf.cos(phase) - inphase * tf.sin(phase)
                 )
+
+        #                 shape = I + j Q
+        #                 shape * exp(i*angle) = (I + j Q) * (cos(angle) + j  sin(angle))
+        #                 = I cos + I j sin + Q j cos - Q sin
 
         norm = tf.sqrt(tf.cast(amp_tot_sq, tf.float64))
         inphase = tf.add_n(inphase_comps, name="inphase")

@@ -123,10 +123,10 @@ class C1(Optimizer):
         tf.float64
             Value of the goal function
         """
-        self.pmap.set_parameters_scaled(current_params)
+        self.exp.pmap.set_parameters_scaled(current_params)
         if self.update_model:
-            self.pmap.model.update_model()
-        dims = self.pmap.model.dims
+            self.exp.pmap.model.update_model()
+        dims = self.exp.pmap.model.dims
         propagators = self.exp.get_gates()
         try:
             goal = self.fid_func(propagators, self.index, dims, self.evaluation + 1)
@@ -154,6 +154,7 @@ class C1(Optimizer):
         self.optim_status["goal"] = float(goal)
         self.optim_status["time"] = time.asctime()
         self.evaluation += 1
+        print(f"{goal=}")
         return goal
 
     def include_model(self):

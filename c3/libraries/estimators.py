@@ -34,6 +34,7 @@ def median_dist(exp_values, sim_values, exp_stds, shots):
 def rms_dist(exp_values, sim_values, exp_stds, shots):
     """Return the root mean squared of the differences."""
     diffs = tf.abs(tf.subtract(exp_values, sim_values))
+    #     print(f"{diffs.shape}")
     return tf.sqrt(tf.reduce_mean(diffs ** 2))
 
 

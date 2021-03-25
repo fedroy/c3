@@ -40,10 +40,12 @@ class ParameterMap:
     def __initialize_parameters(self) -> None:
         par_lens = {}
         pars = {}
+        par_ids = []
         par_ids_model = []
         for comp in self.__components.values():
             for par_name, par_value in comp.params.items():
                 par_id = "-".join([comp.name, par_name])
+                par_ids.append([[par_id]])
                 par_lens[par_id] = par_value.length
                 pars[par_id] = par_value
                 par_ids_model.append(par_id)
@@ -55,9 +57,11 @@ class ParameterMap:
                 for comp in instr.comps[chan]:
                     for par_name, par_value in instr.comps[chan][comp].params.items():
                         par_id = "-".join([gate, chan, comp, par_name])
+                        par_ids.append([[par_id]])
                         par_lens[par_id] = par_value.length
                         pars[par_id] = par_value
 
+        self.__par_ids = par_ids
         self.__par_lens = par_lens
         self.__pars = pars
         self.__par_ids_model = par_ids_model
@@ -329,10 +333,13 @@ class ParameterMap:
                 ret.append("\n")
         return "".join(ret)
 
-    def print_parameters(self, opt_map=None) -> None:
+
+    def print_parameters(self, opt_map=None, full=False) -> None:
         """
         Print current parameters to stdout.
         """
         if opt_map is None:
             opt_map = self.opt_map
+        if full:
+            opt_map = self.__par_ids
         print(self.str_parameters(opt_map))

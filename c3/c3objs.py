@@ -88,6 +88,8 @@ class Quantity:
             minmax = [0.9 * value, 1.1 * value]
             min_val = np.min(minmax, axis=0)
             max_val = np.max(minmax, axis=0)
+        self.min_val = min_val
+        self.max_val = max_val
         self.offset = np.array(min_val) * pref
         self.scale = np.abs(np.array(max_val) - np.array(min_val)) * pref
         self.unit = unit

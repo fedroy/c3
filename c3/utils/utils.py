@@ -89,9 +89,9 @@ def num3str(val: float, use_prefix: bool = True) -> str:
     """Convert a number to a human readable string in engineering notation. """
     if use_prefix:
         num, prefix = eng_num(val)
-        formatted_string = f"{num:.3f} " + prefix
+        formatted_string = f"{num:.6f} " + prefix
     else:
-        formatted_string = f"{val:.3} "
+        formatted_string = f"{val:.6f} "
     return formatted_string
 
 

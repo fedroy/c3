@@ -41,6 +41,7 @@ class Optimizer:
         self.__dir_path = None
         self.logdir = None
         self.set_algorithm(algorithm)
+        self.goal_run_with_grad = self.goal_run_with_grad_no_batch
 
     def set_algorithm(self, algorithm: Callable) -> None:
         if algorithm:
@@ -234,7 +235,8 @@ class Optimizer:
             current_params = tf.constant(input_parameters)
             goal = self.goal_run(current_params)
             self.log_parameters()
-            goal = float(goal)
+            if isinstance(goal, tf.Tensor):
+                goal = float(goal.numpy())
             return goal
         else:
             current_params = input_parameters
@@ -268,3 +270,10 @@ class Optimizer:
         if isinstance(goal, tf.Tensor):
             goal = float(goal)
         return goal
+
+    def goal_run_with_grad_no_batch(self, current_params):
+        with tf.GradientTape() as t:
+            t.watch(current_params)
+            goal = self.goal_run(current_params)
+        grad = t.gradient(goal, current_params)
+        return goal, grad
