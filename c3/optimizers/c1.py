@@ -53,7 +53,7 @@ class C1(Optimizer):
         store_unitaries=False,
         options={},
         run_name=None,
-        interactive=True
+        interactive=True,
     ) -> None:
         super().__init__(
             pmap=pmap,
@@ -137,15 +137,17 @@ class C1(Optimizer):
         tf.float64
             Value of the goal function
         """
-        self.pmap.set_parameters_scaled(current_params)
+        self.exp.pmap.set_parameters_scaled(current_params)
         if self.update_model:
-            self.pmap.model.update_model()
-        dims = self.pmap.model.dims
+            self.exp.pmap.model.update_model()
+        dims = self.exp.pmap.model.dims
         propagators = self.exp.get_gates()
         try:
             goal = self.fid_func(propagators, self.index, dims, self.evaluation + 1)
         except TypeError:
-            goal = self.fid_func(self.exp, propagators, self.index, dims, self.evaluation + 1)
+            goal = self.fid_func(
+                self.exp, propagators, self.index, dims, self.evaluation + 1
+            )
 
         with open(self.logdir + self.logname, "a") as logfile:
             logfile.write(f"\nEvaluation {self.evaluation + 1} returned:\n")
@@ -166,6 +168,7 @@ class C1(Optimizer):
         self.optim_status["goal"] = float(goal)
         self.optim_status["time"] = time.asctime()
         self.evaluation += 1
+        print(f"{goal=}")
         return goal
 
     def include_model(self):

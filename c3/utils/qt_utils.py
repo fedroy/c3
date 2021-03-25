@@ -151,6 +151,7 @@ def rotation(phase, xyz):
 X90p = rotation(np.pi / 2, [1, 0, 0])  # Rx+
 X90m = rotation(-np.pi / 2, [1, 0, 0])  # Rx-
 Xp = rotation(np.pi, [1, 0, 0])
+Xm = rotation(-np.pi, [1, 0, 0])
 Y90p = rotation(np.pi / 2, [0, 1, 0])  # Ry+
 Y90m = rotation(-np.pi / 2, [0, 1, 0])  # Ry-
 Yp = rotation(np.pi, [0, 1, 0])
@@ -265,7 +266,7 @@ def perfect_gate(gates_str: str, index=[0, 1], dims=[2, 2], proj: str = "wzeros"
     # (and ordered)
     for gate_str in gates_str.split(":"):
         lvls = dims[gate_num]
-        if gate_str == "Id":
+        if gate_str == "Id" or gate_str == "QId":
             gate = Id
         elif gate_str == "X90p":
             gate = X90p
@@ -273,6 +274,8 @@ def perfect_gate(gates_str: str, index=[0, 1], dims=[2, 2], proj: str = "wzeros"
             gate = X90m
         elif gate_str == "Xp":
             gate = Xp
+        elif gate_str == "Xm":
+            gate = Xm
         elif gate_str == "Y90p":
             gate = Y90p
         elif gate_str == "Y90m":
@@ -334,7 +337,7 @@ def perfect_gate(gates_str: str, index=[0, 1], dims=[2, 2], proj: str = "wzeros"
         else:
             print("gate_str must be one of the basic 90 or 180 degree gates.")
             print(
-                "'Id','X90p','X90m','Xp','Y90p',",
+                "'QId',Id','X90p','X90m','Xp','Xm','Y90p',",
                 "'Y90m','Yp','Z90p','Z90m','Zp', 'CNOT'",
             )
             return None

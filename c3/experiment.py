@@ -261,6 +261,8 @@ class Experiment:
                 for line, ctrls in instr.comps.items():
                     # TODO calculate properly the average frequency that each qubit sees
                     offset = 0.0
+                    if "nodrive" in ctrls:
+                        offset = ctrls["nodrive"].params["freq_offset"].get_value()
                     if "gauss" in ctrls:
                         if ctrls["gauss"].params["amp"] != 0.0:
                             offset = ctrls["gauss"].params["freq_offset"].get_value()
@@ -278,7 +280,8 @@ class Experiment:
                         ctrls["carrier"].params["framechange"].get_value(),
                         tf.complex128,
                     )
-                t_final = tf.Variable(instr.t_end - instr.t_start, dtype=tf.complex128)
+                    # framechanges[line] = tf.constant(0.0, tf.complex128)
+                t_final = tf.constant(instr.t_end - instr.t_start, dtype=tf.complex128)
                 FR = model.get_Frame_Rotation(t_final, freqs, framechanges)
                 if model.lindbladian:
                     SFR = tf_utils.tf_super(FR)
@@ -301,7 +304,7 @@ class Experiment:
                     dephasing_channel = model.get_dephasing_channel(t_final, amps)
                     U = tf.matmul(dephasing_channel, U)
             gates[gate] = U
-            self.unitaries = gates
+        self.unitaries = gates
         return gates
 
     def propagation(self, signal: dict, gate):

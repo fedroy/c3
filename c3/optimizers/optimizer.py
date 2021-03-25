@@ -44,6 +44,7 @@ class Optimizer:
         self.logname = None
         self.options = None
         self.set_algorithm(algorithm)
+        self.goal_run_with_grad = self.goal_run_with_grad_no_batch
 
     def set_algorithm(self, algorithm):
         if algorithm:

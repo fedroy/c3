@@ -325,17 +325,21 @@ class Model:
         tf.Tensor
             A (diagonal) propagator that adjust phases
         """
-        exponent = tf.Variable(0.0, dtype=tf.complex128)
+        exponent = tf.constant(0.0, dtype=tf.complex128)
         for line in freqs.keys():
             freq = freqs[line]
             framechange = framechanges[line]
             qubit = self.couplings[line].connected[0]
-            # TODO extend this to multiple qubits
-            ann_oper = self.ann_opers[self.names.index(qubit)]
-            num_oper = tf.Variable(
-                np.matmul(ann_oper.T.conj(), ann_oper), dtype=tf.complex128
+            #             ann_oper = self.ann_opers[self.names.index(qubit)]
+            #             num_oper = tf.constant(
+            #                 np.matmul(ann_oper.T.conj(), ann_oper), dtype=tf.complex128
+            #             )
+            # TODO test dressing of FR, do you need generalized identity?
+            a = self.ann_opers[self.names.index(qubit)]
+            num_oper = tf.constant(
+                a.T.conj() @ a - (a.T.conj() @ a.T.conj() @ a @ a) / 2,
+                dtype=tf.complex128,
             )
-            # TODO test dressing of FR
             exponent = exponent + 1.0j * num_oper * (freq * t_final + framechange)
         FR = tf.linalg.expm(exponent)
         return FR

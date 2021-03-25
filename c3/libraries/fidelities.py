@@ -258,7 +258,7 @@ def average_infid(U_dict: dict, gate: str, index, dims, proj=True):
         Project to computational subspace
     """
     U = U_dict[gate]
-    U_ideal = tf.Variable(
+    U_ideal = tf.constant(
         perfect_gate(gate, index, dims=[2] * len(dims)), dtype=tf.complex128
     )
     infid = 1 - tf_average_fidelity(U, U_ideal, lvls=dims)
