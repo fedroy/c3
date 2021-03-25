@@ -22,6 +22,8 @@ from c3.parametermap import ParameterMap
 from c3.signal.gates import Instruction
 from c3.system.model import Model
 from c3.utils import tf_utils
+from c3.utils.qt_utils import perfect_gate
+
 
 
 class Experiment:
@@ -42,12 +44,13 @@ class Experiment:
 
     """
 
-    def __init__(self, pmap=None):
+    def __init__(self, pmap: ParameterMap = None):
         self.pmap = pmap
         self.opt_gates = None
-        self.unitaries = {}
-        self.dUs = {}
+        self.unitaries: dict = {}
+        self.dUs: dict = {}
         self.created_by = None
+        self.logdir: str = None
 
     def set_created_by(self, config):
         """
@@ -121,6 +124,26 @@ class Experiment:
             instructions.append(instr)
 
         self.pmap = ParameterMap(instructions, generator=gen, model=model)
+
+    def read_config(self, filepath: str) -> None:
+        """
+        Load a file and parse it to create a Model object.
+
+        Parameters
+        ----------
+        filepath : str
+            Location of the configuration file
+
+        """
+        with open(filepath, "r") as cfg_file:
+            cfg = hjson.loads(cfg_file.read())
+        model = Model()
+        model.fromdict(cfg["model"])
+        generator = Generator()
+        generator.fromdict(cfg["generator"])
+        pmap = ParameterMap(model=model, generator=generator)
+        pmap.fromdict(cfg["instructions"])
+        self.pmap = pmap
 
     def write_config(self, filepath: str) -> None:
         """
@@ -220,11 +243,42 @@ class Experiment:
                     pops = pops_select
                 else:
                     pops = tf.reshape(pops, [pops.shape[0]])
-            #             if "meas_rescale" in model.tasks:
-            #                 populations_no_rescale.append(pops)
-            #                 pops = model.tasks["meas_rescale"].rescale(pops)
+                        if "meas_rescale" in model.tasks:
+                            populations_no_rescale.append(pops)
+                            pops = model.tasks["meas_rescale"].rescale(pops)
             populations_final.append(pops)
         return populations_final, populations_no_rescale
+
+    def get_perfect_gates(self, gate_keys: list = None) -> Dict[str, np.array]:
+        """Return a perfect gateset for the gate_keys.
+
+        Parameters
+        ----------
+        gate_keys: list
+            (Optional) List of gates to evaluate.
+
+        Returns
+        -------
+        Dict[str, np.array]
+            A dictionary of gate names and np.array representation
+            of the corresponding unitary
+
+        Raises
+        ------
+        Exception
+            Raise general exception for undefined gate
+        """
+        instructions = self.pmap.instructions
+        gates = {}
+        dims = self.pmap.model.dims
+        if gate_keys is None:
+            gate_keys = instructions.keys()  # type: ignore
+        for gate in gate_keys:
+            gates[gate] = perfect_gate(gates_str=gate, dims=dims)
+
+        # TODO parametric gates
+
+        return gates
 
     def get_gates(self):
         """
@@ -261,17 +315,10 @@ class Experiment:
                 for line, ctrls in instr.comps.items():
                     # TODO calculate properly the average frequency that each qubit sees
                     offset = 0.0
-                    if "nodrive" in ctrls:
-                        offset = ctrls["nodrive"].params["freq_offset"].get_value()
-                    if "gauss" in ctrls:
-                        if ctrls["gauss"].params["amp"] != 0.0:
-                            offset = ctrls["gauss"].params["freq_offset"].get_value()
-                    if "flux" in ctrls:
-                        if ctrls["flux"].params["amp"] != 0.0:
-                            offset = ctrls["flux"].params["freq_offset"].get_value()
-                    if "pwc" in ctrls:
-                        offset = ctrls["pwc"].params["freq_offset"].get_value()
-                    # print("gate: ", gate, "; line: ", line, "; offset: ", offset)
+                    for ctrl in ctrls.values():
+                        if "freq_offset" in ctrl.params.keys():
+                            if ctrl.params["amp"] != 0.0:
+                                offset = ctrl.params["freq_offset"].get_value()
                     freqs[line] = tf.cast(
                         ctrls["carrier"].params["freq"].get_value() + offset,
                         tf.complex128,
@@ -280,7 +327,6 @@ class Experiment:
                         ctrls["carrier"].params["framechange"].get_value(),
                         tf.complex128,
                     )
-                    # framechanges[line] = tf.constant(0.0, tf.complex128)
                 t_final = tf.constant(instr.t_end - instr.t_start, dtype=tf.complex128)
                 FR = model.get_Frame_Rotation(t_final, freqs, framechanges)
                 if model.lindbladian:
@@ -298,7 +344,7 @@ class Experiment:
                     for line, ctrls in instr.comps.items():
                         amp, sum = generator.devices["awg"].get_average_amp()
                         amps[line] = tf.cast(amp, tf.complex128)
-                    t_final = tf.Variable(
+                    t_final = tf.constant(
                         instr.t_end - instr.t_start, dtype=tf.complex128
                     )
                     dephasing_channel = model.get_dephasing_channel(t_final, amps)
@@ -334,15 +380,16 @@ class Experiment:
             signals.append(signal[key]["values"])
             ts = signal[key]["ts"]
             hks.append(hctrls[key])
-        dt = tf.Variable(ts[1].numpy() - ts[0].numpy(), dtype=tf.complex128)
+        dt = tf.constant(ts[1].numpy() - ts[0].numpy(), dtype=tf.complex128)
 
         if model.lindbladian:
             col_ops = model.get_Lindbladians()
             dUs = tf_utils.tf_propagation_lind(h0, hks, col_ops, signals, dt)
         else:
-            dUs = tf_utils.tf_propagation(h0, hks, signals, dt)
+            dUs = tf_utils.tf_propagation_vectorized(h0, hks, signals, dt)
         self.dUs[gate] = dUs
         self.ts = ts
+        dUs = tf.cast(dUs, tf.complex128)
         U = tf_utils.tf_matmul_left(dUs)
         self.U = U
         return U

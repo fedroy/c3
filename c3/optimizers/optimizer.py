@@ -2,13 +2,12 @@
 
 import os
 import time
-import hjson
-import tensorflow as tf
+from typing import Callable, Union
 import numpy as np
+import tensorflow as tf
+import json
 import c3.libraries.algorithms as algorithms
-import c3.utils.qt_utils as qt_utils
-import c3.utils.tf_utils as tf_utils
-from typing import Union
+from c3.experiment import Experiment
 
 
 class Optimizer:
@@ -19,10 +18,6 @@ class Optimizer:
     ----------
     algorithm : callable
         From the algorithm library
-    plot_dynamics : boolean
-        Save plots of time-resolved dynamics in dir_path
-    plot_pulses : boolean
-        Save plots of control signals
     store_unitaries : boolean
         Store propagators as text and pickle
     """
@@ -43,10 +38,12 @@ class Optimizer:
         self.created_by = None
         self.logname = None
         self.options = None
+        self.__dir_path = None
+        self.logdir = None
         self.set_algorithm(algorithm)
         self.goal_run_with_grad = self.goal_run_with_grad_no_batch
 
-    def set_algorithm(self, algorithm):
+    def set_algorithm(self, algorithm: Callable) -> None:
         if algorithm:
             self.algorithm = algorithm
         else:
@@ -64,17 +61,22 @@ class Optimizer:
         """
         old_logdir = self.logdir
         self.logdir = new_logdir
+
+        if old_logdir is None:
+            return
+
         try:
-            os.remove(os.path.join(self.dir_path, "recent"))
+            os.remove(os.path.join(self.__dir_path, "recent"))
         except FileNotFoundError:
             pass
-        # os.remove(self.dir_path + self.string)
+        # os.remove(self.__dir_path + self.string)
+
         try:
             os.rmdir(old_logdir)
         except OSError:
             pass
 
-    def set_exp(self, exp) -> None:
+    def set_exp(self, exp: Experiment) -> None:
         self.exp = exp
 
     def set_created_by(self, config) -> None:
@@ -85,7 +87,8 @@ class Optimizer:
 
     def load_best(self, init_point) -> None:
         """
-        Load a previous parameter point to start the optimization from. Legacy wrapper. Method moved to Parametermap.
+        Load a previous parameter point to start the optimization from. Legacy wrapper.
+        Method moved to Parametermap.
 
         Parameters
         ----------
@@ -106,13 +109,13 @@ class Optimizer:
             logfile.write("Starting optimization at ")
             logfile.write(start_time_str)
             logfile.write("Optimization parameters:\n")
-            logfile.write(hjson.dumps(self.pmap.opt_map))
+            logfile.write(json.dumps(self.pmap.opt_map))
             logfile.write("\n")
             logfile.write("Units:\n")
-            logfile.write(hjson.dumps(self.pmap.get_opt_units()))
+            logfile.write(json.dumps(self.pmap.get_opt_units()))
             logfile.write("\n")
             logfile.write("Algorithm options:\n")
-            logfile.write(hjson.dumps(self.options))
+            logfile.write(json.dumps(self.options))
             logfile.write("\n")
             logfile.flush()
 
@@ -156,7 +159,7 @@ class Optimizer:
                     "units": self.pmap.get_opt_units(),
                     "optim_status": self.optim_status,
                 }
-                best_point.write(hjson.dumps(best_dict))
+                best_point.write(json.dumps(best_dict))
                 best_point.write("\n")
         if self.store_unitaries:
             self.exp.store_Udict(self.optim_status["goal"])
@@ -165,70 +168,20 @@ class Optimizer:
             logfile.write(
                 f"\nFinished evaluation {self.evaluation} at {time.asctime()}\n"
             )
-            # logfile.write(hjson.dumps(self.optim_status, indent=2))
-            logfile.write(hjson.dumps(self.optim_status))
+            # logfile.write(json.dumps(self.optim_status, indent=2))
+            logfile.write(json.dumps(self.optim_status))
             logfile.write("\n")
             logfile.flush()
 
-    def fct_to_min(
-        self, x: Union[np.ndarray, tf.Variable]
-    ) -> Union[np.ndarray, tf.Variable]:
+    def goal_run(
+        self, current_params: Union[np.ndarray, tf.constant]
+    ) -> Union[np.ndarray, tf.constant]:
         """
-        Wrapper for the goal function.
-
-        Parameters
-        ----------
-        x : [np.array, tf.Variable]
-            Vector of parameters in the optimizer friendly way.
-
-        Returns
-        -------
-        [float, tf.Variable]
-            Value of the goal function. Float if input is np.array else tf.Variable
+        Placeholder for the goal function. To be implemented by inherited classes.
         """
+        return 0
 
-        if isinstance(x, np.ndarray):
-            current_params = tf.Variable(x)
-            goal = self.goal_run(current_params)  # type: ignore
-            self.log_parameters()
-            if isinstance(goal, tf.Tensor):
-                goal = float(goal.numpy())
-            return goal
-        else:
-            current_params = x
-            # TODO Why does mypy through an AttributeNotFound error?
-            goal = self.goal_run(current_params)  # type: ignore
-            self.log_parameters()
-            return goal
-
-    def fct_to_min_autograd(self, x):
-        """
-         Wrapper for the goal function, including evaluation and storage of the
-         gradient.
-
-        Parameters
-         ----------
-         x : np.array
-             Vector of parameters in the optimizer friendly way.
-
-         Returns
-         -------
-         float
-             Value of the goal function.
-        """
-        current_params = tf.Variable(x)
-        goal, grad = self.goal_run_with_grad(current_params)
-        if isinstance(grad, tf.Tensor):
-            grad = grad.numpy()
-        gradients = grad.flatten()
-        self.gradients[str(current_params.numpy())] = gradients
-        self.optim_status["gradient"] = gradients.tolist()
-        self.log_parameters()
-        if isinstance(goal, tf.Tensor):
-            goal = float(goal.numpy())
-        return goal
-
-    def goal_run_with_grad_no_batch(self, current_params):
+    def goal_run_with_grad(self, current_params):
         with tf.GradientTape() as t:
             t.watch(current_params)
             goal = self.goal_run(current_params)
@@ -250,4 +203,77 @@ class Optimizer:
             Value of the gradient.
         """
         key = str(x)
-        return self.gradients.pop(key)
+        gradient = self.gradients.pop(key)
+        if np.any(np.isnan(gradient)) or np.any(np.isinf(gradient)):
+            # TODO: is simply a warning sufficient?
+            gradient[
+                np.isnan(gradient)
+            ] = 1e-10  # Most probably at boundary of Quantity
+            gradient[
+                np.isinf(gradient)
+            ] = 1e-10  # Most probably at boundary of Quantity
+        return gradient
+
+    def fct_to_min(
+        self, input_parameters: Union[np.ndarray, tf.constant]
+    ) -> Union[np.ndarray, tf.constant]:
+        """
+        Wrapper for the goal function.
+
+        Parameters
+        ----------
+        x : [np.array, tf.constant]
+            Vector of parameters in the optimizer friendly way.
+
+        Returns
+        -------
+        [float, tf.constant]
+            Value of the goal function. Float if input is np.array else tf.constant
+        """
+
+        if isinstance(input_parameters, np.ndarray):
+            current_params = tf.constant(input_parameters)
+            goal = self.goal_run(current_params)
+            self.log_parameters()
+            if isinstance(goal, tf.Tensor):
+                goal = float(goal.numpy())
+            return goal
+        else:
+            current_params = input_parameters
+            goal = self.goal_run(current_params)
+            self.log_parameters()
+            return goal
+
+    def fct_to_min_autograd(self, x):
+        """
+         Wrapper for the goal function, including evaluation and storage of the
+         gradient.
+
+        Parameters
+         ----------
+         x : np.array
+             Vector of parameters in the optimizer friendly way.
+
+         Returns
+         -------
+         float
+             Value of the goal function.
+        """
+        current_params = tf.constant(x)
+        goal, grad = self.goal_run_with_grad(current_params)
+        if isinstance(grad, tf.Tensor):
+            grad = grad.numpy()
+        gradients = grad.flatten()
+        self.gradients[str(current_params.numpy())] = gradients
+        self.optim_status["gradient"] = gradients.tolist()
+        self.log_parameters()
+        if isinstance(goal, tf.Tensor):
+            goal = float(goal)
+        return goal
+
+    def goal_run_with_grad_no_batch(self, current_params):
+        with tf.GradientTape() as t:
+            t.watch(current_params)
+            goal = self.goal_run(current_params)
+        grad = t.gradient(goal, current_params)
+        return goal, grad

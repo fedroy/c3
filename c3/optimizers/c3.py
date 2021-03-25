@@ -15,7 +15,6 @@ from c3.libraries.estimators import (
     g_LL_prime_combined,
     g_LL_prime,
     neg_loglkh_multinom_norm,
-    rms_dist,
 )
 
 
@@ -192,17 +191,12 @@ class C3(Optimizer):
             pass
 
     def _one_par_sim_vals(
-        self, current_params: tf.Variable, m: dict, ipar: int, target: str
+        self, current_params: tf.constant, m: dict, ipar: int, target: str
     ) -> tf.float64:
         seqs_pp = self.seqs_per_point
         m = self.learn_from[ipar]
         gateset_params = m["params"]
-        m_vals = m["results"][:seqs_pp]
-        m_stds = np.array(m["result_stds"][:seqs_pp])
-        m_shots = m["shots"][:seqs_pp]
         sequences = m["seqs"][:seqs_pp]
-        if target == "all":
-            num_seqs = len(sequences) * 3
         self.pmap.set_parameters_scaled(current_params)
         self.pmap.str_parameters()
         self.pmap.model.update_model()
@@ -340,62 +334,6 @@ class C3(Optimizer):
         print(f"{goal.numpy()=}")
         return goal
 
-    #     def goal_run_with_grad_no_batch(self, current_params):
-    #         """
-    #         Same as goal_run but with gradient. Very resource intensive. Unoptimized at the
-    #         moment.
-    #         """
-    #         exp_values = []
-    #         sim_values = []
-    #         exp_stds = []
-    #         exp_shots = []
-    #         count = 0
-    #         seqs_pp = self.seqs_per_point
-
-    #         with tf.GradientTape() as t:
-    #             t.watch(current_params)
-    #             for target, data in self.learn_data.items():
-    #                 self.learn_from = data["seqs_grouped_by_param_set"]
-    #                 self.gateset_opt_map = data["opt_map"]
-    #                 indeces = self.select_from_data(self.batch_sizes[target])
-    #                 for ipar in indeces:
-    #                     count += 1
-    #                     data_set = self.learn_from[ipar]
-    #                     m_vals = data_set["results"][:seqs_pp]
-    #                     sim_vals = self._one_par_sim_vals(
-    #                         current_params, data_set, ipar, target
-    #                     )
-    #                     sim_values.extend(sim_vals)
-    #                     exp_values.extend(m_vals)
-
-    #                     self._log_one_dataset(data_set, ipar, indeces, sim_vals, count)
-
-    #             goal = self.fom(
-    #                     exp_values,
-    #                     tf.stack(sim_values),
-    #                     tf.Variable(exp_stds, dtype=tf.float64),
-    #                     tf.Variable(exp_shots, dtype=tf.float64)
-    #                 )
-    #         grad = t.gradient(goal, current_params).numpy()
-    #         goal = goal.numpy()
-
-    #         with open(self.logdir + self.logname, "a") as logfile:
-    #             logfile.write("\nFinished batch with ")
-    #             logfile.write("{}: {}\n".format(self.fom.__name__, goal))
-    #             for cb_fom in self.callback_foms:
-    #                 val = float(cb_fom(exp_values, sim_values, exp_stds, exp_shots).numpy())
-    #                 logfile.write("{}: {}\n".format(cb_fom.__name__, val))
-    #             logfile.flush()
-
-    #         self.optim_status["params"] = [
-    #             par.numpy().tolist() for par in self.pmap.get_parameters()
-    #         ]
-    #         self.optim_status["goal"] = goal
-    #         self.optim_status["gradient"] = list(grad.flatten())
-    #         self.optim_status["time"] = time.asctime()
-    #         self.evaluation += 1
-    #         return goal, grad
-
     def goal_run_batch(self, current_params: tf.Variable) -> tf.float64:
         """
         Evaluate the figure of merit for the current model parameters.
@@ -446,15 +384,15 @@ class C3(Optimizer):
                     one_goal = neg_loglkh_multinom_norm(
                         m_vals,
                         tf.stack(sim_vals),
-                        tf.Variable(m_stds, dtype=tf.float64),
-                        tf.Variable(m_shots, dtype=tf.float64),
+                        tf.constant(m_stds, dtype=tf.float64),
+                        tf.constant(m_shots, dtype=tf.float64),
                     )
                 else:
                     one_goal = g_LL_prime(
                         m_vals,
                         tf.stack(sim_vals),
-                        tf.Variable(m_stds, dtype=tf.float64),
-                        tf.Variable(m_shots, dtype=tf.float64),
+                        tf.constant(m_stds, dtype=tf.float64),
+                        tf.constant(m_shots, dtype=tf.float64),
                     )
                 exp_stds.extend(m_stds)
                 exp_shots.extend(m_shots)
@@ -508,6 +446,16 @@ class C3(Optimizer):
 
                 count += 1
                 data_set = self.learn_from[ipar]
+
+                seqs_pp = self.seqs_per_point
+                m_vals = data_set["results"][:seqs_pp]
+                m_stds = np.array(data_set["result_stds"][:seqs_pp])
+                m_shots = data_set["shots"][:seqs_pp]
+                sequences = data_set["seqs"][:seqs_pp]
+                num_seqs = len(sequences)
+                if target == "all":
+                    num_seqs = len(sequences) * 3
+
                 with tf.GradientTape() as t:
                     t.watch(current_params)
                     sim_vals = self._one_par_sim_vals(
@@ -518,25 +466,17 @@ class C3(Optimizer):
                         one_goal = neg_loglkh_multinom_norm(
                             m_vals,
                             tf.stack(sim_vals),
-                            tf.Variable(m_stds, dtype=tf.float64),
-                            tf.Variable(m_shots, dtype=tf.float64),
+                            tf.constant(m_stds, dtype=tf.float64),
+                            tf.constant(m_shots, dtype=tf.float64),
                         )
                     else:
                         one_goal = g_LL_prime(
                             m_vals,
                             tf.stack(sim_vals),
-                            tf.Variable(m_stds, dtype=tf.float64),
-                            tf.Variable(m_shots, dtype=tf.float64),
+                            tf.constant(m_stds, dtype=tf.float64),
+                            tf.constant(m_shots, dtype=tf.float64),
                         )
 
-                seqs_pp = self.seqs_per_point
-                m_vals = data_set["results"][:seqs_pp]
-                m_stds = np.array(data_set["result_stds"][:seqs_pp])
-                m_shots = data_set["shots"][:seqs_pp]
-                sequences = data_set["seqs"][:seqs_pp]
-                num_seqs = len(sequences)
-                if target == "all":
-                    num_seqs = len(sequences) * 3
                 exp_stds.extend(m_stds)
                 exp_shots.extend(m_shots)
                 seq_weigths.append(num_seqs)

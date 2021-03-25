@@ -45,7 +45,7 @@ Imports
 Model components
 ^^^^^^^^^^^^^^^^
 
-We first create a qubit. Each parameter is a Quantity (Qty()) object
+We first create a qubit. Each parameter is a Quantity (``Qty()``) object
 with bounds and a unit. In :math:`C^3`, the default multi-level qubit is
 a Transmon modelled as a Duffing oscillator with frequency
 :math:`\omega` and anharmonicity :math:`\delta` :
@@ -147,7 +147,7 @@ And the same for a second qubit.
     )
 
 A static coupling between the two is realized in the following way. We
-supply the type of coupling by selecting int_XX
+supply the type of coupling by selecting ``int_XX``
 :math:`(b_1+b_1^\dagger)(b_2+b_2^\dagger)` from the hamiltonian library.
 The “connected” property contains the list of qubit names to be coupled,
 in this case “Q1” and “Q2”.
@@ -315,7 +315,8 @@ following device represents a simple, linear conversion factor.
         )
     )
 
-The generator combines the parts of the signal generation.
+The generator combines the parts of the signal generation and assigns a
+signal chain to each control line.
 
 .. code-block:: python
 
@@ -354,9 +355,10 @@ The generator combines the parts of the signal generation.
                     outputs=1
                 )
             },
-            chain=[
-                "LO", "AWG", "DigitalToAnalog", "Response", "Mixer", "VoltsToHertz"
-            ]
+            chains= {
+                "d1": ["LO", "AWG", "DigitalToAnalog", "Response", "Mixer", "VoltsToHertz"],
+                "d2": ["LO", "AWG", "DigitalToAnalog", "Response", "Mixer", "VoltsToHertz"]
+            }
         )
 
 Gates-set and Parameter map
@@ -366,8 +368,8 @@ It remains to write down what kind of operations we want to perform on
 the device. For a gate based quantum computing chip, we define a
 gate-set.
 
-We choose a gate time and a gaussian envelope shape with a list of
-parameters.
+We choose a gate time of 7ns and a gaussian envelope shape with a list
+of parameters.
 
 .. code-block:: python
 
@@ -442,8 +444,8 @@ We also define a gate that represents no driving.
     )
 
 We specify the drive tones with an offset from the qubit frequencies. As
-in experiment, we will later adjust the resonance by modulating the
-envelope function.
+is done in experiment, we will later adjust the resonance by modulating
+the envelope function.
 
 .. code-block:: python
 
@@ -489,14 +491,14 @@ Then we add a carrier and envelope to each.
 
 .. code-block:: python
 
-    X90p_q1 = gates.Instruction(
-        name="X90p",
+    RX90p_q1 = gates.Instruction(
+        name="RX90p",
         t_start=0.0,
         t_end=t_final,
         channels=["d1"]
     )
-    X90p_q2 = gates.Instruction(
-        name="X90p",
+    RX90p_q2 = gates.Instruction(
+        name="RX90p",
         t_start=0.0,
         t_end=t_final,
         channels=["d2"]
@@ -514,13 +516,13 @@ Then we add a carrier and envelope to each.
         channels=["d2"]
     )
 
-    X90p_q1.add_component(gauss_env_single, "d1")
-    X90p_q1.add_component(carr, "d1")
+    RX90p_q1.add_component(gauss_env_single, "d1")
+    RX90p_q1.add_component(carr, "d1")
     QId_q1.add_component(nodrive_env, "d1")
     QId_q1.add_component(copy.deepcopy(carr), "d1")
 
-    X90p_q2.add_component(copy.deepcopy(gauss_env_single), "d2")
-    X90p_q2.add_component(carr_2, "d2")
+    RX90p_q2.add_component(copy.deepcopy(gauss_env_single), "d2")
+    RX90p_q2.add_component(carr_2, "d2")
     QId_q2.add_component(copy.deepcopy(nodrive_env), "d2")
     QId_q2.add_component(copy.deepcopy(carr_2), "d2")
 
@@ -537,33 +539,33 @@ by adding a phase after each gate that realigns the frames.
         (-sideband * t_final * 2 * np.pi ) % (2*np.pi)
     )
 
-The remainder of the gates-set can be derived from the X90p gate by
+The remainder of the gates-set can be derived from the RX90p gate by
 shifting its phase by multiples of :math:`\pi/2`.
 
 .. code-block:: python
 
-    Y90p_q1 = copy.deepcopy(X90p_q1)
-    Y90p_q1.name = "Y90p"
-    X90m_q1 = copy.deepcopy(X90p_q1)
-    X90m_q1.name = "X90m"
-    Y90m_q1 = copy.deepcopy(X90p_q1)
-    Y90m_q1.name = "Y90m"
+    Y90p_q1 = copy.deepcopy(RX90p_q1)
+    Y90p_q1.name = "RY90p"
+    X90m_q1 = copy.deepcopy(RX90p_q1)
+    X90m_q1.name = "RX90m"
+    Y90m_q1 = copy.deepcopy(RX90p_q1)
+    Y90m_q1.name = "RY90m"
     Y90p_q1.comps['d1']['gauss'].params['xy_angle'].set_value(0.5 * np.pi)
     X90m_q1.comps['d1']['gauss'].params['xy_angle'].set_value(np.pi)
     Y90m_q1.comps['d1']['gauss'].params['xy_angle'].set_value(1.5 * np.pi)
-    Q1_gates = [QId_q1, X90p_q1, Y90p_q1, X90m_q1, Y90m_q1]
+    Q1_gates = [QId_q1, RX90p_q1, Y90p_q1, X90m_q1, Y90m_q1]
 
 
-    Y90p_q2 = copy.deepcopy(X90p_q2)
-    Y90p_q2.name = "Y90p"
-    X90m_q2 = copy.deepcopy(X90p_q2)
-    X90m_q2.name = "X90m"
-    Y90m_q2 = copy.deepcopy(X90p_q2)
-    Y90m_q2.name = "Y90m"
+    Y90p_q2 = copy.deepcopy(RX90p_q2)
+    Y90p_q2.name = "RY90p"
+    X90m_q2 = copy.deepcopy(RX90p_q2)
+    X90m_q2.name = "RX90m"
+    Y90m_q2 = copy.deepcopy(RX90p_q2)
+    Y90m_q2.name = "RY90m"
     Y90p_q2.comps['d2']['gauss'].params['xy_angle'].set_value(0.5 * np.pi)
     X90m_q2.comps['d2']['gauss'].params['xy_angle'].set_value(np.pi)
     Y90m_q2.comps['d2']['gauss'].params['xy_angle'].set_value(1.5 * np.pi)
-    Q2_gates = [QId_q2, X90p_q2, Y90p_q2, X90m_q2, Y90m_q2]
+    Q2_gates = [QId_q2, RX90p_q2, Y90p_q2, X90m_q2, Y90m_q2]
 
 With the single qubit gates in place, we can combine them to get all
 possible combinations of simultaneous gates on both qubits.
@@ -618,35 +620,60 @@ rotation on one qubit and the identity.
 
 .. code-block:: python
 
-    exp.set_opt_gates(['X90p:Id', 'Id:Id'])
+    exp.set_opt_gates(['RX90p:Id', 'Id:Id'])
 
-The actual numerical simulation is done by calling exp.get_gates().
-*WARNING:* This is resource intensive.
+The actual numerical simulation is done by calling ``exp.get_gates()``.
+This is the most resource intensive part as it involves solving the
+equations of motion for the system.
 
 .. code-block:: python
 
     unitaries = exp.get_gates()
 
-After this step the unitaries or process matrices are stored in the exp object.
-
-
-
-To investigate dynamics, we define an initial state with finite
-temperature we set earlier.
 
 .. code-block:: python
 
-    psi_init = exp.model.tasks["init_ground"].initialise(
-                    exp.model.drift_H,
-                    exp.model.lindbladian
-                )
 
-Since we stored the process matrices, evaluating sequences is now relatively inexpensive.
-. We start with just one gate
 
-.. code-block:: python
+Dynamics
+~~~~~~~~
 
-    barely_a_seq = ['X90p:Id']
+To investigate dynamics, we define the ground state as an initial state.
+
+.. code:: ipython3
+
+    psi_init = [[0] * 9]
+    psi_init[0][0] = 1
+    init_state = tf.transpose(tf.constant(psi_init, tf.complex128))
+
+.. code:: ipython3
+
+    init_state
+
+
+
+
+.. parsed-literal::
+
+    <tf.Tensor: shape=(9, 1), dtype=complex128, numpy=
+    array([[1.+0.j],
+           [0.+0.j],
+           [0.+0.j],
+           [0.+0.j],
+           [0.+0.j],
+           [0.+0.j],
+           [0.+0.j],
+           [0.+0.j],
+           [0.+0.j]])>
+
+
+
+Since we stored the process matrices, we can now relatively inexpensively
+evaluate sequences. We start with just one gate
+
+.. code:: ipython3
+
+    barely_a_seq = ['RX90p:Id']
 
 and plot system dynamics.
 
@@ -702,9 +729,9 @@ and plot system dynamics.
 .. image:: dyn_singleX.png
 
 
-We can see a bad, un-optimized gate. The labels indicate qubit states in
-the product basis. Next we increase the number of repetitions of the
-same gate.
+We can see an ill-defined un-optimized gate. The labels indicate qubit
+states in the product basis. Next we increase the number of repetitions
+of the same gate.
 
 .. code-block:: python
 
@@ -715,16 +742,16 @@ same gate.
 
 .. parsed-literal::
 
-    ['X90p:Id',
-     'X90p:Id',
-     'X90p:Id',
-     'X90p:Id',
-     'X90p:Id',
-     'X90p:Id',
-     'X90p:Id',
-     'X90p:Id',
-     'X90p:Id',
-     'X90p:Id']
+    ['RX90p:Id',
+     'RX90p:Id',
+     'RX90p:Id',
+     'RX90p:Id',
+     'RX90p:Id',
+     'RX90p:Id',
+     'RX90p:Id',
+     'RX90p:Id',
+     'RX90p:Id',
+     'RX90p:Id']
 
 
 
